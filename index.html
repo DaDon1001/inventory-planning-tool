@@ -191,6 +191,28 @@ details.more[open] summary{border-bottom:1px solid var(--line)}
 @media print{#top,#aiBtn,#ai,#drawer,body::after{display:none}body{background:#fff;color:#000}}
 
 .frame svg.chart{max-height:440px}
+/* playbook */
+.lvls{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.lvls div{border:1px solid;border-left-width:4px;padding:8px 10px;background:rgba(8,16,24,.7);font-size:12px}
+.lvls b{display:block;font:600 11px var(--mono);letter-spacing:.12em;margin-bottom:3px}.lvls span{display:block;color:var(--ink)}.lvls i{display:block;color:var(--muted);font-style:normal;margin-top:4px}
+@media(max-width:1100px){.lvls{grid-template-columns:1fr 1fr}}
+.lvb{display:inline-block;font:11px var(--mono);letter-spacing:.08em;border:1px solid;padding:1px 6px;white-space:nowrap}
+.sim label{display:flex;align-items:center;gap:12px;margin:6px 0;font:11px var(--mono);letter-spacing:.1em;color:var(--muted);text-transform:uppercase}
+.sim input[type=range]{flex:1;max-width:720px;accent-color:var(--cyan);padding:0;border:none;background:none}
+.sim b{font:500 14px var(--mono);color:var(--ink);min-width:110px;text-transform:none;letter-spacing:0}
+.jump{font:11px var(--mono);color:var(--muted);margin:6px 0 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.gaugebar{margin-top:24px}.gb{position:relative;height:26px;background:rgba(56,214,255,.05);border:1px solid var(--line)}
+.gb b{position:absolute;left:0;top:0;bottom:0;opacity:.85}
+.gb u{position:absolute;top:6px;bottom:6px;border:1px dashed #86a2b6;border-left:none}
+.gb i{position:absolute;top:-6px;bottom:-6px;width:2px;background:#fff;z-index:2}.gb i.m{background:var(--magenta)}
+.gb i::after{content:attr(data-l);position:absolute;top:-16px;left:4px;font:10px var(--mono);color:var(--ink);white-space:nowrap}
+.steps{display:grid;gap:8px;margin-top:14px}
+.step{display:grid;grid-template-columns:130px 1fr;gap:14px;padding:10px 14px;border:1px solid var(--line);background:rgba(8,16,24,.6)}
+.step.hot{border-color:var(--amber);background:linear-gradient(90deg,rgba(255,176,59,.09),rgba(8,16,24,.6) 50%)}
+.sn{font:300 30px/1 var(--mono);color:var(--cyan)}.sn em{display:block;font:normal 10px var(--mono);letter-spacing:.2em;color:var(--muted);margin-top:4px}
+.step.hot .sn{color:var(--amber)}
+.sq{font:500 15px var(--sans)}.sf{font:12px var(--mono);color:var(--amber);margin:3px 0}.sa{font-size:13.5px;color:var(--ink)}
+.note{color:var(--muted);font-size:12px;text-transform:none;letter-spacing:0}
 
 /* ---- assistant ---- */
 #aiBtn{position:fixed;right:22px;bottom:22px;z-index:40;display:flex;align-items:center;gap:10px;padding:8px 16px 8px 8px;border-radius:40px;border:1px solid var(--cyan);background:rgba(5,10,16,.92);color:var(--cyan);font:12px var(--mono);letter-spacing:.16em;box-shadow:0 0 18px rgba(56,214,255,.35)}
@@ -257,7 +279,7 @@ details.more[open] summary{border-bottom:1px solid var(--line)}
   <div class="aiw">⚠ The key is stored only in this browser and is sent only to api.anthropic.com. It is never part of the website or the GitHub repo. Anyone using this browser profile could use it, so use a key with a low monthly spend limit, don't save it on shared computers, and press "Forget key" when done. Each question costs a small amount of API credit.</div>
  </div>
  <div id="aiLog" aria-live="polite"></div>
- <div class="aisug"><button>MIN for CSBL</button><button>Why is the safety stock of CSRM so high?</button><button>Which SKU has the most orders?</button><button>Financing need</button></div>
+ <div class="aisug"><button>MIN for CSBL</button><button>Why is the safety stock of CSRM so high?</button><button>Which SKU has the most orders?</button><button>What should happen if CSBL falls under the safety line?</button></div>
  <form id="aiF"><input id="aiQ" placeholder="Ask about triggers, buffers, orders, cash…" autocomplete="off"><button>SEND</button></form>
 </section>
 
@@ -506,13 +528,14 @@ page("brief","00","Briefing","MISSION OVERVIEW",(el,P,cfg)=>{
     ["04","What do we buy, and when?","buy",`${nf(total(F.map(s=>s.out.orders)))} orders for ${nf(total(F.map(s=>s.out.qty)))} pcs worth ${eur(total(F.map(s=>s.out.spend)))}.`],
     ["05","How much money sits in stock?","capital",`${eur(P.cash.val.avgAll)} on average incl. prepaid goods in the pipeline; ${eur(P.cash.val.avgShelf)} on the shelf.`],
     ["06","Can the business fund it?","cash",`Financing need ${eur(f.trough)} on ${fmtDate(f.troughDay)}; cash turns positive after that and ends at ${eur(f.cashEnd)}.`],
-    ["07","Can we trust the numbers?","audit",`${R.ok} of ${R.n} results identical to the recalculated Excel workbook.`]];
+    ["07","Can we trust the numbers?","audit",`${R.ok} of ${R.n} results identical to the recalculated Excel workbook.`],
+    ["08","What if stock falls under the safety line?","playbook",`${nf(inBuf)} SKU-days below the line, ${nf(total(F.map(s=>s.out.riskDays)))} of them at risk; a 7-step playbook and simulator say what to do.`]];
   el.innerHTML=head("00","MISSION OVERVIEW","Inventory plan 2025 at a glance",`${pass===9?"✓ All nine shirt SKUs run through 2025 without a single lost sale":"⚠ "+(9-pass)+" SKU(s) fail a check"}, and the plan needs ${eur(-f.trough)} of financing at its lowest point.`)+
   `<div id="gauges">${ring(pass/9,"SKUs passing",`${pass} / 9`,"no lost sales, closing ≥ top week, valid lot",pass===9)}${ring(sold?1-lost/sold:1,"Service level",`${nf(lost)} pcs lost`,"share of demand served",lost===0)}${ring(1-inBuf/(9*HORIZON),"Days above buffer",`${nf(9*HORIZON-inBuf)} SKU-days`,`${nf(inBuf)} SKU-days dipped into the buffer`,inBuf/(9*HORIZON)<0.25)}${ring(f.in25/(f.in25+f.ar31),"Cash collected 2025",eur(f.in25),`${eur(f.ar31)} still open 31 Dec`,true)}${ring(R.ok/R.n,"Excel match",`${R.ok} / ${R.n}`,"default settings vs workbook",R.ok===R.n)}</div>
   <h3>The fleet – click a SKU to stress-test it</h3>
   <div class="fleet">${F.map(s=>`<button class="tile" data-k="${s.k}"><div class="tc">${s.code}</div><div class="tn">${s.name}</div><span class="lamp" style="color:${s.out.pass?COL.blue:COL.orange}">${s.out.pass?"✓ PASS":"⚠ CHECK"}</span>${spark(s.days.map(d=>d.shelf),COL.blue,s.lv.buffer)}<div class="tm"><div>MIN<b>${nf(s.lv.trigger)}</b></div><div>BUFFER<b>${nf(s.lv.buffer)}</b></div><div>MAX<b>${nf(s.lv.ceiling)}</b></div><div>ORDERS<b>${s.out.orders}</b></div></div></button>`).join("")}</div>
   <div class="lg2"><span>Line = stock on shelf through 2025</span><span><i class="sw" style="border-top:1px dashed #ffb03b;height:0"></i>dashed = buffer (safety stock)</span></div>
-  <h3>Seven questions, seven answers</h3>
+  <h3>Eight questions, eight answers</h3>
   <div class="qa">${ans.map(a=>`<a href="#${a[2]}"><div class="qn">${a[0]} →</div><div class="qq">${a[1]}</div><div class="qr">${a[3]}</div></a>`).join("")}</div>`;
   el.querySelectorAll(".tile").forEach(t=>t.onclick=()=>{ S.sku=+t.dataset.k; go("replay"); });
 });
@@ -723,6 +746,69 @@ window.addEventListener("DOMContentLoaded",()=>{
   syncBar(); recompute();
 });
 
+// =====================================================================
+//  PAGE 08 – BUFFER BREACH PLAYBOOK (uses replay results only; changes no numbers)
+// =====================================================================
+const ALERT = [
+  {lv:0, tag:"L0 · NORMAL",    sym:"●", col:"#38d6ff", what:"Shelf at or above the safety line", act:"No action. The normal MIN rule keeps ordering."},
+  {lv:1, tag:"L1 · WATCH",     sym:"◐", col:"#38d6ff", what:"Below the safety line, but stock lasts until the next delivery", act:"Check daily. This is what the buffer is for; no extra order."},
+  {lv:2, tag:"L2 · AT RISK",   sym:"▲", col:"#ffb03b", what:"Below the safety line and stock runs out before the next delivery", act:"Expedite the next inbound order and ration the remaining stock."},
+  {lv:3, tag:"L3 · CRITICAL",  sym:"■", col:"#ffb03b", what:"Nothing inbound, or less than 7 days of cover left", act:"Order now, expedite, escalate to management, warn customers."},
+  {lv:4, tag:"L4 · STOCK-OUT", sym:"✕", col:"#ff6b6b", what:"Shelf is empty – sales are being lost", act:"Emergency: fastest supply option, backorders, root-cause review."}];
+function paceAt(s, d, cfg){ const w=cfg.pulseDays; let a=0; for(let i=Math.max(0,d-w+1);i<=d;i++) a+=s.sig.perDay[i]; return a/Math.min(w,d+1); }
+function nextInbound(s, d){ return s.book.find(o=>o.eta>d)||null; }
+function assess(s, d, cfg, shelfOverride){
+  const r=s.days[d], lv=s.lv, shelf=shelfOverride??r.shelf, pace=paceAt(s,d,cfg), inbound=r.pipe, nx=nextInbound(s,d);
+  const eta=nx?nx.eta-d:null, cover=pace===0?999:shelf/pace, position=shelf+inbound;
+  const orderQty=position<=lv.trigger?(Math.floor((lv.trigger-position)/lv.lot)+1)*lv.lot:0;
+  const gap=eta===null?Math.max(0,Math.ceil(pace*lv.span-shelf)):Math.max(0,Math.ceil(pace*eta-shelf));
+  const level=shelf<=0?4:shelf>=lv.buffer?0:eta===null?3:cover>=eta?1:(cover<7?3:2);
+  const pullIn=eta===null?null:Math.max(0,Math.ceil(eta-cover));
+  return {d, r, shelf, pace, inbound, nx, eta, cover, position, orderQty, gap, level, pullIn, below:shelf<lv.buffer};
+}
+function episodes(s){ const out=[]; let st=-1;
+  for(let d=0; d<=HORIZON; d++){ const below=d<HORIZON && s.days[d].zone!=="above";
+    if(below && st<0) st=d; if(!below && st>=0){ const seg=s.days.slice(st,d); out.push({start:st,end:d-1,len:d-st,low:Math.min(...seg.map(x=>x.shelf)),risk:seg.filter(x=>x.zone==="notsafe"||x.zone==="nodelivery").length,recovered:d<HORIZON?d:null,landed:d<HORIZON?s.days[d].landed:0}); st=-1; } }
+  return out; }
+function levelBadge(l){ const a=ALERT[l]; return `<span class="lvb" style="color:${a.col};border-color:${a.col}">${a.sym} ${a.tag}</span>`; }
+
+page("playbook","08","Playbook","BUFFER BREACH PLAYBOOK",(el,P,cfg)=>{
+  const F=P.fleet, s=F[S.sku], lv=s.lv, span=lv.span;
+  if(S.pbDay===undefined||S.pbSkuSeen!==S.sku){ const f=s.days.find(x=>x.zone==="notsafe")||s.days.find(x=>x.zone!=="above")||s.days[200]; S.pbDay=f.day; S.pbShelf=null; S.pbSkuSeen=S.sku; }
+  const d=S.pbDay, A=assess(s,d,cfg,S.pbShelf), eps=episodes(s), fleetA=F.map(p=>({p,a:assess(p,d,cfg)}));
+  const totBelow=total(F.map(p=>p.out.belowDays)), totRisk=total(F.map(p=>p.out.riskDays));
+  const arrive=A.orderQty?fmtDate(d+span):null;
+  const steps=[
+    ["DETECT","Is the shelf below the safety line?",`Shelf ${nf(A.shelf)} vs safety stock ${nf(lv.buffer)}`, A.below?`▲ Yes – ${nf(lv.buffer-A.shelf)} pcs below the line. Start the playbook.`:`● No – ${nf(A.shelf-lv.buffer)} pcs above the line. Nothing to do.`, A.below],
+    ["POSITION","Is enough stock already on order?",`Shelf + inbound = ${nf(A.shelf)} + ${nf(A.inbound)} = ${nf(A.position)} vs MIN ${nf(lv.trigger)}`, A.orderQty?`▲ No – position ≤ MIN. Order <b>${nf(A.orderQty)} pcs today</b> (${A.orderQty/lv.lot} × lot ${nf(lv.lot)}), available ${arrive}.`:`● Yes – position is above MIN, the MIN rule needs no new order.`, !!A.orderQty],
+    ["INBOUND","When does the next delivery land?",A.nx?`Order #${A.nx.seq}: ${nf(A.nx.qty)} pcs, placed ${fmtDate(A.nx.day)}`:"No order is on its way", A.nx?`● In <b>${A.eta} days</b> (${fmtDate(A.nx.eta)}).`:`■ Nothing inbound – place an order immediately (lead time ${span} days).`, !A.nx],
+    ["COVER TEST",`Does the shelf last until then? (guide rule, last ${cfg.pulseDays} days)`,`Shelf ÷ avg daily sales = ${nf(A.shelf)} ÷ ${A.pace.toFixed(1)} = ${A.cover>=999?"∞":A.cover.toFixed(1)} days vs ${A.eta??"–"} days to delivery`, A.eta===null?"■ Cannot be covered – no delivery scheduled.":A.cover>=A.eta?"● Yes – safe to use the safety stock. Monitor daily.":`▲ No – early warning. About <b>${nf(A.gap)} pcs</b> short before the delivery lands.`, A.eta===null||A.cover<A.eta],
+    ["ACT","What to do if the cover test fails",A.level>=2?`Gap ≈ ${nf(A.gap)} pcs · delivery must come ≥ ${A.pullIn??"–"} day(s) earlier`:"Not needed at this level",
+      A.level>=2?`1) Ask the supplier to expedite order #${A.nx?A.nx.seq:"(new)"} by ≥ ${A.pullIn??span} day(s) (faster freight / split shipment).<br>2) Ration: serve open orders first, cap large orders, offer partial deliveries.<br>3) Tell sales and key customers about a possible delay.${A.level>=3?"<br>4) Escalate to management today; consider an extra emergency order.":""}`:"● Keep the normal routine.", A.level>=2],
+    ["ESCALATE","Which alert level applies?",ALERT[A.level].what, `${levelBadge(A.level)} ${ALERT[A.level].act}`, A.level>=2],
+    ["RECOVER","After the delivery lands",`Check shelf ≥ ${nf(lv.buffer)} again; count buffer episodes`, `Close the alert once the shelf is back above the line. If a SKU hits L2+ repeatedly (${s.code}: ${nf(s.out.riskDays)} risk days in 2025), raise its reserve – e.g. by ≈ ${nf(Math.ceil(Math.max(...s.days.filter(x=>x.zone==="notsafe").map(x=>{ const nx=nextInbound(s,x.day); return nx?Math.max(0,paceAt(s,x.day,cfg)*(nx.eta-x.day)-x.shelf):0; }),0)/100)*100)} pcs – and review the trigger.`, false]];
+  el.innerHTML=head("08","BUFFER BREACH PLAYBOOK","What should happen when stock falls under the safety line?",`Falling below the safety line is normal in busy weeks (${nf(totBelow)} SKU-days in 2025). It only becomes a problem when the shelf will run out <b>before the next delivery</b> (${nf(totRisk)} SKU-days). The steps below say exactly what to do, using the live plan.`)+
+  `<h3>Alert levels</h3><div class="lvls">${ALERT.map(a=>`<div style="border-color:${a.col}"><b style="color:${a.col}">${a.sym} ${a.tag}</b><span>${a.what}</span><i>${a.act}</i></div>`).join("")}</div>
+  <h3>Simulator</h3>${chips("pbc",S.sku,false)}
+  <div class="frame sim" data-tag="WHAT-IF">
+   <label>Date <input id="pbd" type="range" min="0" max="${HORIZON-1}" value="${d}"> <b>${fmtDate(d)}</b></label>
+   <label>Shelf stock <input id="pbs" type="range" min="0" max="${lv.ceiling}" step="10" value="${Math.round(A.shelf)}"> <b>${nf(A.shelf)} pcs</b> ${S.pbShelf===null?`<span class="note">(actual from the 2025 replay)</span>`:`<button id="pbr">Back to actual ${nf(A.r.shelf)}</button>`}</label>
+   <div class="jump">Jump to: ${s.days.find(x=>x.zone==="notsafe")?`<button data-j="${s.days.find(x=>x.zone==="notsafe").day}">first at-risk day</button>`:""}${s.days.find(x=>x.zone!=="above")?`<button data-j="${s.days.find(x=>x.zone!=="above").day}">first day below line</button>`:""}<button data-j="${s.out.lowShelf===undefined?0:s.days.findIndex(x=>x.shelf===s.out.lowShelf)}">lowest shelf</button></div>
+   <div class="gaugebar">${(()=>{ const mx=lv.ceiling, x=v=>Math.max(0,Math.min(100,v/mx*100)); return `<div class="gb"><i style="left:${x(lv.buffer)}%" data-l="SAFETY ${nf(lv.buffer)}"></i><i class="m" style="left:${x(lv.trigger)}%" data-l="MIN ${nf(lv.trigger)}"></i><b style="width:${x(A.shelf)}%;background:${ALERT[A.level].col}"></b><u style="left:${x(A.shelf)}%;width:${Math.max(0,Math.min(100-x(A.shelf),A.inbound/mx*100))}%"></u></div><div class="lg2"><span><i class="sw" style="background:${ALERT[A.level].col}"></i>Shelf</span><span><i class="sw" style="background:repeating-linear-gradient(90deg,#86a2b6 0 3px,transparent 3px 6px)"></i>Inbound (dashed)</span><span>Lines: safety stock and MIN</span><span>${levelBadge(A.level)}</span></div>`; })()}</div>
+  </div>
+  <div class="steps">${steps.map((st,i)=>`<div class="step${st[4]?" hot":""}"><div class="sn">${String(i+1).padStart(2,"0")}<em>${st[0]}</em></div><div><div class="sq">${st[1]}</div><div class="sf">${st[2]}</div><div class="sa">${st[3]}</div></div></div>`).join("")}</div>
+  <h3>Fleet radar on ${fmtDate(d)}</h3>
+  ${grid(fleetA,[{h:"SKU",v:x=>x.p.code,c:"k"},{h:"Shelf",v:x=>nf(x.a.shelf),c:"n"},{h:"Safety line",v:x=>nf(x.p.lv.buffer),c:"n"},{h:"Inbound",v:x=>nf(x.a.inbound),c:"n"},{h:"Avg/day",v:x=>x.a.pace.toFixed(1),c:"n",tip:`Last ${cfg.pulseDays} days`},{h:"Cover (days)",v:x=>x.a.cover>=999?"∞":x.a.cover.toFixed(1),c:"n"},{h:"Next delivery",v:x=>x.a.nx?`${x.a.eta} d · ${nf(x.a.nx.qty)}`:"none"},{h:"Order today",v:x=>x.a.orderQty?nf(x.a.orderQty):"",c:"n"},{h:"Level",v:x=>levelBadge(x.a.level)}],{cls:x=>x.a.level>=2?"hot":x.a.orderQty?"buy":""})}
+  <h3>${s.code} – every time the shelf went below the line in 2025</h3>
+  ${eps.length?grid(eps,[{h:"#",v:e=>eps.indexOf(e)+1,c:"n"},{h:"From",v:e=>fmtDate(e.start)},{h:"To",v:e=>fmtDate(e.end)},{h:"Days",v:e=>nf(e.len),c:"n"},{h:"Lowest shelf",v:e=>nf(e.low),c:"n"},{h:"At-risk days",v:e=>e.risk?"⚠ "+e.risk:"✓ 0"},{h:"Recovered",v:e=>e.recovered!==null?`${fmtDate(e.recovered)} (+${nf(e.landed)} landed)`:"still below on 31 Dec"},{h:"",v:e=>`<button class="jb" data-j="${e.start}">simulate</button>`}],{tall:true,cls:e=>e.risk?"hot":""}):`<p class="lead">${s.code} never went below its safety line in 2025.</p>`}`;
+  bindChips(el,"pbc",k=>{ S.sku=k; });
+  const rd=el.querySelector("#pbd"), rs=el.querySelector("#pbs");
+  rd.oninput=()=>{ rd.nextElementSibling.textContent=fmtDate(+rd.value); }; rd.onchange=()=>{ S.pbDay=+rd.value; S.pbShelf=null; draw(); };
+  rs.oninput=()=>{ rs.nextElementSibling.textContent=nf(+rs.value)+" pcs"; }; rs.onchange=()=>{ S.pbShelf=+rs.value; draw(); };
+  const rb=el.querySelector("#pbr"); if(rb) rb.onclick=()=>{ S.pbShelf=null; draw(); };
+  el.querySelectorAll("[data-j]").forEach(b=>b.onclick=()=>{ S.pbDay=+b.dataset.j; S.pbShelf=null; draw(); });
+});
+
 let CHART_UID=0;
 function hudDefs(id,series){
   return `<defs><filter id="gl${id}" x="-10%" y="-30%" width="120%" height="160%"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`+
@@ -810,6 +896,7 @@ function aiSku(t){
   return (col||size)?f:null;
 }
 const PER=[ // per-SKU metrics: [regex, label, getter, formatter, explanation]
+  [/(days|time|how long|how often)[a-z ]*below safety|below safety stock for|not safe|safe to use|days below/, "Days below safety stock", p=>p.out.belowDays, nf, p=>`${nf(p.out.belowDays)} days below safety stock, of which ${nf(p.out.ordersotSafe)} flagged NOT safe (shelf ÷ recent daily sales < days until next delivery).`],
   [/lowest (stock|shelf|level|point)|minimum stock on (the )?shelf/, "Lowest stock on shelf in 2025", p=>p.out.lowShelf, nf, p=>`The smallest value of the daily column 'Shelf'.`],
   [/safety ?stock|\bss\b|buffer/, "Safety stock", p=>p.lv.buffer, nf, p=>`Safety stock = MIN − average sales in lead time = ${nf(p.lv.trigger)} − ${nf(p.lv.cycleDemand)} = <b>${nf(p.lv.buffer)}</b>.`+(S.cfg.triggerRule==="peak"?` With MIN on the Peak basis, this is the gap between the busiest ${S.cfg.coverWeeks*7}-day period (${nf(p.lv.peak)}) and an average one (${nf(p.lv.cycleDemand)})${p.lv.reserve?` plus an extra reserve of ${nf(p.lv.reserve)}`:""}, so SKUs with uneven demand (variation ${pct(p.sig.week.cv)}) get more.`:"")],
   [/reorder|\bmin\b|\bminimum\b|\brop\b/, "MIN (reorder point)", p=>p.lv.trigger, nf, p=>{ const inp=S.cfg, base=inp.triggerRule==="average"?p.lv.cycleDemand:p.lv.peak; return `MIN = ${inp.triggerRule==="average"?`average sales in lead time (${nf(p.lv.meanWeek)}/week × ${inp.coverWeeks} weeks)`:`highest sales in any ${inp.coverWeeks*7}-day lead time`} ${nf(base)} + extra reserve ${nf(p.lv.reserve)} = <b>${nf(p.lv.trigger)}</b>. An order is placed whenever position (shelf + on order) ≤ MIN.`; }],
@@ -817,7 +904,6 @@ const PER=[ // per-SKU metrics: [regex, label, getter, formatter, explanation]
   [/opening|starting stock|start stock|1 jan/, "Opening stock 1 Jan", p=>p.lv.launch, nf, p=>`Opening stock = sales of the first ${S.cfg.coverWeeks*7} days + safety stock = ${nf(p.lv.firstCycle)} + ${nf(p.lv.buffer)} = <b>${nf(p.lv.launch)}</b>.`],
   [/lost|stock ?-?out|ran out|run out|empty|shortage/, "Lost sales", p=>p.out.lost, nf, p=>`Lost sales per day = MAX(0, sold − (yesterday's shelf + received)). Total 2025: <b>${nf(p.out.lost)}</b> pcs.`],
   [/closing|end of (the )?year|31 dec|year.?end/, "Closing stock 31 Dec", p=>p.out.closing, nf, p=>`Closing stock ${nf(p.out.closing)} vs highest week ${nf(p.out.topWeek)} → ${p.out.closingOk?"✓ covers the highest week":"⚠ below the highest week"}.`],
-  [/below safety|not safe|safe to use|days below/, "Days below safety stock", p=>p.out.belowDays, nf, p=>`${nf(p.out.belowDays)} days below safety stock, of which ${nf(p.out.ordersotSafe)} flagged NOT safe (shelf ÷ recent daily sales < days until next delivery).`],
   [/multiple|moq|batch|lot size|order size/, "Order multiple", p=>p.lv.lot, nf, p=>`Orders are placed in multiples of <b>${nf(p.lv.lot)}</b> pcs (MOQ for size ${p.size}: ${nf(S.cfg.minLot[sizeOf(p.code)])}).`],
   [/price|cost per|unit cost/, "Purchase price", p=>p.cost, eur2, p=>`Purchase price ${eur2(p.cost)}, sale price ${eur2(p.price)} → margin ${eur2(p.price-p.cost)} per piece.`],
   [/inventory value|stock value|tied up|capital/, "Average inventory value", p=>p.out.avgVTotal, eur, p=>`Average total value (shelf + handling + transit) × purchase price = <b>${eur(p.out.avgVTotal)}</b>; on the shelf only ${eur(p.out.avgVShelf)}.`],
@@ -861,6 +947,10 @@ function aiOffline(q){
     const list=skus&&skus.length?skus:S.plan.fleet, rr=list.map(p=>p.days[dIdx]);
     if(list.length===1){ const r=rr[0]; return `<b>${list[0].code}</b> on ${fmtDate(dIdx)}: shelf <b>${nf(r.shelf)}</b>, on order ${nf(r.pipe)}, position ${nf(r.position)}, sold that day ${nf(r.demand)}${r.placed?`, order placed ${nf(r.placed)}`:""}. Status: ${ZONE[r.zone]}.`; }
     return `Stock on shelf on ${fmtDate(dIdx)}: <b>${nf(total(rr.map(r=>r.shelf)))}</b> pcs over ${list.length} SKUs (`+list.map((p,i)=>`${p.code} ${nf(rr[i].shelf)}`).join(" · ")+`). Value on shelf ${eur(total(rr.map(r=>r.vShelf)))}.`;
+  }
+  if(/what (should|to do|happens?|do i do|do we do)|playbook|action plan|\bfalls?\b|\bdrops?\b|\bgoes? (under|below)|under the safety|safety line|\bbreach/.test(t)&&/safety|buffer|line|risk|below|under|breach/.test(t)){
+    const p=(skus&&skus.length?skus[0]:S.plan.fleet[S.sku]), cfg=S.cfg, eps=episodes(p), rk=p.days.find(x=>x.zone==="notsafe"), a=rk?assess(p,rk.day,cfg):null;
+    return `When ${p.code}'s shelf falls under its safety line (${nf(p.lv.buffer)} pcs):<br>1) <b>Detect</b> – shelf &lt; safety stock starts the playbook.<br>2) <b>Position</b> – if shelf + inbound ≤ MIN ${nf(p.lv.trigger)}, order today in lots of ${nf(p.lv.lot)}; it arrives ${p.lv.span} days later.<br>3) <b>Inbound</b> – find the next delivery date.<br>4) <b>Cover test</b> – shelf ÷ avg daily sales (last ${cfg.pulseDays} days) ≥ days to delivery? Yes → watch daily (L1). No → early warning.<br>5) <b>Act</b> (L2) – expedite the next order, ration stock, warn sales/customers.<br>6) <b>Escalate</b> (L3) – nothing inbound or under 7 days of cover: order now, escalate to management. L4 = stock-out.<br>7) <b>Recover</b> – close once back above the line; raise the reserve if it keeps happening.<br>In 2025 ${p.code} went below the line ${eps.length} times (${nf(p.out.belowDays)} days, ${nf(p.out.riskDays)} at risk)`+(a?`; e.g. on ${fmtDate(rk.day)} cover was ${a.cover.toFixed(1)} days vs delivery in ${a.eta} days → ${ALERT[a.level].tag}, about ${nf(a.gap)} pcs short.`:".")+` Try it on page 08 Playbook.`;
   }
   const metric=PER.find(([re])=>re.test(t));
   const rank=/which|what sku|most|highest|lowest|least|fewest|biggest|smallest|largest|rank|compare|best|worst/.test(t);
