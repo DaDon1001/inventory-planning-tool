@@ -875,23 +875,31 @@ function freight(cfg){
   for (const s of Wk.list){ book[s.p].weekly[s.c] += s.pal; book[s.p].wCost += s.cost; }
   return {A, B, Wk, sens, sales, book, t: {ships: B.t.ships, pal: B.t.pal, cost: B.t.cost}};
 }
-function palletSvg(){
-  const sc = 2.2, W = 120 * sc, H = 80 * sc, pad = 14;
-  const lay = (x0, bw, bh, nx, ny, col, lab) => { let s = `<rect x="${x0}" y="${pad}" width="${W}" height="${H}" fill="rgba(56,214,255,.04)" stroke="${COL.muted}" stroke-dasharray="4 3"/>`;
+function layerSvg(panels, mixed){
+  const sc = 2.1, W = 120 * sc, H = 80 * sc, pad = 12, gapX = 50;
+  const one = (x0, bw, bh, nx, ny, col, lab) => { let s = `<rect x="${x0}" y="${pad}" width="${W}" height="${H}" fill="rgba(255,176,59,.10)" stroke="${COL.muted}" stroke-dasharray="4 3"/>`;
+    s += `<rect x="${x0}" y="${pad}" width="${nx * bw * sc}" height="${ny * bh * sc}" fill="#05080d"/>`;
     for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) s += `<rect x="${x0 + i * bw * sc + 2}" y="${pad + j * bh * sc + 2}" width="${bw * sc - 4}" height="${bh * sc - 4}" fill="${col}" fill-opacity=".22" stroke="${col}" stroke-width="1.5"/>`;
-    return s + `<text x="${x0 + W / 2}" y="${pad + H + 22}" class="ax" text-anchor="middle">${lab}</text>`; };
-  return `<svg class="chart" viewBox="0 0 ${2 * W + 80} ${H + 60}" role="img" aria-label="Euro pallet layer layouts">` +
-    lay(10, 30, 40, 4, 2, COL.blue, "Small 40×30 → 8 per layer × 4 = 32") + lay(W + 60, 60, 40, 2, 2, COL.orange, "M/L 60×40 → 4 per layer × 4 = 16") + `</svg>`;
+    const n = nx * ny, gap = 9600 - n * bw * bh;
+    return s + (lab ? `<text x="${x0 + W / 2}" y="${pad + H + 20}" class="ax" text-anchor="middle">${lab}</text><text x="${x0 + W / 2}" y="${pad + H + 38}" class="ax" text-anchor="middle" fill="${gap ? COL.orange : COL.blue}">${n} per layer${gap ? ` · ${gap.toLocaleString("en-US")} cm² empty` : " · no gap"}</text>` : ""); };
+  if (mixed){ let s = one(10, 60, 40, 1, 2, COL.orange, ""); s = s.replace(/^/, "");
+    for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) s += `<rect x="${10 + 60 * sc + i * 30 * sc + 2}" y="${pad + j * 40 * sc + 2}" width="${30 * sc - 4}" height="${40 * sc - 4}" fill="${COL.blue}" fill-opacity=".22" stroke="${COL.blue}" stroke-width="1.5"/>`;
+    return `<svg class="chart" style="max-width:380px;margin:auto" viewBox="0 0 ${W + 20} ${H + 50}" role="img" aria-label="Mixed layer">${s.replace(/fill="rgba\(255,176,59,\.10\)"/, 'fill="none"')}<text x="${10 + W / 2}" y="${pad + H + 22}" class="ax" text-anchor="middle">2 M/L + 4 Small = one full layer</text></svg>`; }
+  return `<svg class="chart" viewBox="0 0 ${2 * W + gapX + 20} ${H + 56}" role="img" aria-label="Pallet layer layouts">` + panels.map((p, i) => one(10 + i * (W + gapX), ...p)).join("") + `</svg>`;
 }
-
 page("freight","09","Freight","FREIGHT VOLUME",(el,P,cfg)=>{
   const FR=P.freight, A=FR.A, B=FR.B.t, Wk=FR.Wk.t, C=DATA.countries;
   if(S.fMode===undefined){ S.fMode="daily"; S.fC=-1; }
   const mode=S.fMode==="daily"?FR.B:FR.Wk, rows=mode.list.filter(s=>S.fC<0||s.c===S.fC);
-  const ex=FR.B.list.find(s=>s.box.filter(b=>b).length>=3&&s.box.slice(0,3).some(b=>b)&&s.box.slice(3).some(b=>b))||FR.B.list[0];
+  const lineBox=s=>total(DATA.orders.filter(o=>o[0]===s.start&&o[3]===s.c).map(o=>Math.ceil(o[2]/cfg.packQty[sizeOf(DATA.skus[o[1]])])));
+  const ex=FR.B.list.find(s=>s.lines>=3&&s.box.slice(0,3).some(b=>b)&&s.box.slice(3).some(b=>b)&&lineBox(s)>s.boxes)||FR.B.list.find(s=>s.box.filter(b=>b).length>=3)||FR.B.list[0];
   const exSkus=ex.box.map((b,k)=>b?`${DATA.skus[k]} ${b} box${b>1?"es":""}`:"").filter(Boolean).join(" · ");
   const nS=ex.box.slice(0,3).reduce((a,b)=>a+b,0), nML=ex.boxes-nS;
   const scen=[["A","Each order line on its own","no consolidation",A],["B","Daily per customer","main answer · ships on the order date",B],["C","Weekly per customer","recommendation · Mon–Sun, waits ≤ 6 days",Wk]];
+  const exLines=DATA.orders.filter(o=>o[0]===ex.start&&o[3]===ex.c).map(o=>[o[0],o[1],o[2],o[3]]);
+  const perSku=DATA.skus.map((k,i)=>({k,i,z:sizeOf(k),q:total(exLines.filter(o=>o[1]===i).map(o=>o[2]))})).filter(x=>x.q).map(x=>({...x,box:Math.ceil(x.q/cfg.packQty[x.z])})).map(x=>({...x,share:x.box/cfg.perPal[x.z]}));
+  const exLineBoxes=total(exLines.map(o=>Math.ceil(o[2]/cfg.packQty[sizeOf(DATA.skus[o[1]])])));
+  const exWk=Math.floor((ex.start-WEEK0)/7), exWeekStart=exWk*7+WEEK0, exDaily=FR.B.list.filter(s=>s.c===ex.c&&Math.floor((s.start-WEEK0)/7)===exWk), exWeek=FR.Wk.list.find(s=>s.c===ex.c&&s.p===exWk);
   const win=S.fWin??7, X=win===1?FR.B.t:win===7?FR.Wk.t:consolidate(cfg,win).t;
   const curve=Array.from({length:14},(_,i)=>i===0?B:i===6?Wk:consolidate(cfg,i+1).t);
   const bookRows=FR.book.filter(b=>b.start+6>=0);
@@ -919,17 +927,47 @@ page("freight","09","Freight","FREIGHT VOLUME",(el,P,cfg)=>{
       ["COMPARE","Which option is best?","Scenarios A, B, C plus windows of 1, 2, 3, 5 and 7 days.",`Weekly cuts cost by ${pc(1-Wk.cost/B.cost)}; customers wait up to 6 days.`]]
      .map((s,i)=>`<div class="step${i===4?" hot":""}"><div class="sn">${String(i+1).padStart(2,"0")}<em>${s[0]}</em></div><div><div class="sq">${s[1]}</div><div class="sf">${s[2]}</div><div class="sa">${s[3]}</div></div></div>`).join("")}
   </div>
-  <div><h3>Worked example – one daily shipment</h3>
-  <p class="lead">${C[ex.c]} (${LANE_INFO[C[ex.c]][0]}), ${fmtDate(ex.start)}: ${ex.lines} order lines, ${nf(ex.pcs)} pcs → ${exSkus}.</p>
-  <div class="pipe">
-   <div class="node"><div class="nk">① Boxes</div><div class="nv">${ex.boxes}</div><div class="nf">${nS} Small + ${nML} M/L</div></div>
-   <div class="node"><div class="nk">② Pallet share</div><div class="nv">${ex.share.toFixed(3)}</div><div class="nf">${nS} ÷ ${cfg.perPal.S} + ${nML} ÷ ${cfg.perPal.M}</div></div>
-   <div class="node key end"><div class="nk">③ Pallets</div><div class="nv">${ex.pal}</div><div class="nf">ROUNDUP(②) · fill ${pc(ex.fill)}</div></div>
-   <div class="node"><div class="nk">④ Lane</div><div class="nv">${eur2(ex.km*ex.rate)}</div><div class="nf">${nf(ex.km)} km × ${eur2(ex.rate)}</div></div>
-   <div class="node key end"><div class="nk">⑤ Cost</div><div class="nv">${eur(ex.cost)}</div><div class="nf">③ × ④</div></div>
+  <h3>Worked example – from raw orders to freight cost</h3>
+  <p class="lead">One real daily shipment: <b>${C[ex.c]}</b> (delivery to ${LANE_INFO[C[ex.c]][0]}, ${nf(ex.km)} km from Berlin) on <b>${fmtDate(ex.start)}</b>. The same steps run for every shipment in the workbook (Sales_Orders → Daily_Shipments).</p>
+  <div class="cols"><div><div class="sq" style="margin:4px 0 6px">Step 1 – the raw order lines (dataset)</div>
+  ${grid(exLines,[{h:"Date",v:o=>fmtDate(o[0])},{h:"Customer",v:o=>C[o[3]]},{h:"SKU",v:o=>DATA.skus[o[1]],c:"k"},{h:"Quantity",v:o=>nf(o[2]),c:"n"},{h:"Boxes if rounded per line",v:o=>Math.ceil(o[2]/cfg.packQty[sizeOf(DATA.skus[o[1]])]),c:"n",how:o=>`ROUNDUP(${o[2]} ÷ ${cfg.packQty[sizeOf(DATA.skus[o[1]])]})`}])}
+  </div><div><div class="sq" style="margin:4px 0 6px">Steps 2–4 – total per SKU, round up to boxes, convert to pallet share</div>
+  ${grid([...perSku,null],[{h:"SKU",v:x=>x?x.k:"SHIPMENT",c:"k"},{h:"Pieces",v:x=>nf(x?x.q:ex.pcs),c:"n"},{h:"Pcs / box",v:x=>x?cfg.packQty[x.z]:"",c:"n"},{h:"Boxes",v:x=>x?`<b>${x.box}</b>`:`<b>${ex.boxes}</b>`,c:"n",how:x=>x?`ROUNDUP(${x.q} ÷ ${cfg.packQty[x.z]}) = ROUNDUP(${(x.q/cfg.packQty[x.z]).toFixed(2)})`:null},{h:"Empty slots",v:x=>x?x.box*cfg.packQty[x.z]-x.q:ex.cap-ex.pcs,c:"n",tip:"box capacity − pieces"},{h:"Pallet share",v:x=>x?`${x.box} ÷ ${cfg.perPal[x.z]} = ${x.share.toFixed(4)}`:`<b>${ex.share.toFixed(4)}</b>`,c:"n"}])}
   </div></div>
-  <h3>Why 32 and 16 boxes per pallet</h3><div class="cols"><div class="frame" data-tag="EPAL 120 × 80 CM">${palletSvg()}</div>
-  <p class="lead" style="align-self:center">All boxes are 30 cm high, so 4 layers give a 120 cm load. Two Small boxes take the footprint of one Medium/Large box, which is why sizes can share a pallet layer by layer.</p></div></div>
+  <div class="pipe">
+   <div class="node"><div class="nk">⑤ Σ pallet share</div><div class="nv">${ex.share.toFixed(3)}</div><div class="nf">${nS} ÷ ${cfg.perPal.S} + ${nML} ÷ ${cfg.perPal.M}</div></div>
+   <div class="node key end"><div class="nk">⑥ Pallets booked</div><div class="nv">${ex.pal}</div><div class="nf">ROUNDUP(⑤) · fill ${pc(ex.fill)}</div></div>
+   <div class="node"><div class="nk">⑦ Lane price</div><div class="nv">${eur2(ex.km*ex.rate)}</div><div class="nf">${nf(ex.km)} km × ${eur2(ex.rate)} / PAL / km</div></div>
+   <div class="node key end"><div class="nk">⑧ Freight cost</div><div class="nv">${eur(ex.cost)}</div><div class="nf">⑥ × ⑦ = ${ex.pal} × ${eur2(ex.km*ex.rate)}</div></div>
+  </div>
+  <p class="lead">Why total per SKU first: rounding each order line separately would need <b>${exLineBoxes}</b> boxes for this shipment instead of <b>${ex.boxes}</b>; across the year it is ${nf(A.boxes)} vs ${nf(B.boxes)} boxes. A box may hold only one SKU, but pieces of the same SKU for the same customer and day can share a box. Why share the pallet: SKUs may not mix inside a box, but boxes may share a pallet, so the shipment's box shares are added before the single ROUNDUP to whole pallets.</p>
+
+  <h3>Why 32 and 16 boxes per pallet – the packing calculation</h3>
+  <div class="cols"><div class="frame" data-tag="BEST LAYOUTS (USED)">${layerSvg([[30,40,4,2,COL.blue,"Small, 30 cm side along 120"],[60,40,2,2,COL.orange,"M/L, 60 cm side along 120"]])}</div>
+  <div class="frame" data-tag="ALTERNATIVE ORIENTATIONS (REJECTED)">${layerSvg([[40,30,3,2,COL.blue,"Small turned 90°"],[40,60,3,1,COL.orange,"M/L turned 90°"]])}</div></div>
+  ${grid([
+    ["Pallet footprint","EPAL 120 × 80 cm","120 × 80 = 9,600 cm²","9,600 cm²"],
+    ["Box footprint","40 × 30 cm","60 × 40 cm","Small = half of M/L"],
+    ["Upper bound per layer (area)","9,600 ÷ 1,200 = 8","9,600 ÷ 2,400 = 4","no layout can beat this"],
+    ["Orientation 1 (used)","120 ÷ 30 = 4 × 80 ÷ 40 = 2 → <b>8</b>, no gap","120 ÷ 60 = 2 × 80 ÷ 40 = 2 → <b>4</b>, no gap","reaches the upper bound → optimal"],
+    ["Orientation 2 (rejected)","⌊120 ÷ 40⌋ = 3 × ⌊80 ÷ 30⌋ = 2 → 6, 120 × 20 cm strip empty","⌊120 ÷ 40⌋ = 3 × ⌊80 ÷ 60⌋ = 1 → 3, 120 × 20 cm strip empty","25 % less per layer"],
+    ["Layers","box height 30 cm → 4 layers = 120 cm load","4 layers = 120 cm load","+ 14.4 cm pallet ≈ 1.35 m total, stable and stackable in a 2.7 m trailer"],
+    ["Boxes per EPAL","8 × 4 = <b>32</b>","4 × 4 = <b>16</b>","= the slide's values"],
+    ["Pallet share per box","1 ÷ 32 = 0.03125","1 ÷ 16 = 0.0625","2 Small boxes = 1 M/L box"]],
+   [{h:"Step",v:r=>r[0],c:"k"},{h:"Small Shirts box",v:r=>r[1],c:"wrap"},{h:"Medium / Large Shirts box",v:r=>r[2],c:"wrap"},{h:"Meaning",v:r=>r[3],c:"wrap"}])}
+  <div class="cols"><div class="frame" data-tag="MIXED LAYER">${layerSvg([[60,40,1,2,COL.orange,""],[30,40,2,2,COL.blue,""]],true)}</div>
+  <p class="lead" style="align-self:center">Because one M/L footprint (60 × 40) equals exactly two Small footprints (2 × 30 × 40), sizes can be combined in one layer without gaps: e.g. 2 M/L + 4 Small fill a layer (2 × 1/16 + 4 × 1/32 = 1/4 pallet = one layer of four). That is why the tool may simply add the shares (Small ÷ 32 + M/L ÷ 16) and round up once per shipment. All boxes have the same 30 cm height, so layers stack evenly.</p></div>
+
+  <h3>Why weekly consolidation is the optimised choice</h3>
+  ${grid([["Pallets booked",nf(B.pal),nf(Wk.pal),`−${pc(1-Wk.pal/B.pal)}`],["Net pallet space (Σ shares)",B.share.toFixed(1),Wk.share.toFixed(1),"almost the same goods"],["Empty pallet space paid for",(B.pal-B.share).toFixed(1)+" EPAL",(Wk.pal-Wk.share).toFixed(1)+" EPAL",`−${pc(1-(Wk.pal-Wk.share)/(B.pal-B.share))}`],["Pallet fill",pc(B.fill),pc(Wk.fill),"+"+Math.round((Wk.fill-B.fill)*100)+" pp"],["Single-pallet shipments",pc(B.single/B.ships),pc(Wk.single/Wk.ships),""],["Empty space in boxes",((1-B.boxFill)*100).toFixed(1)+"%",((1-Wk.boxFill)*100).toFixed(1)+"%",""],["Freight cost",eur(B.cost),eur(Wk.cost),"−"+eur(B.cost-Wk.cost)],["Longest wait for dispatch","0 days","6 days","service cost"]],
+   [{h:"Measure",v:r=>r[0],c:"k"},{h:"B – daily",v:r=>r[1],c:"n"},{h:"C – weekly",v:r=>r[2],c:"n"},{h:"Effect",v:r=>r[3],c:"n"}])}
+  <div class="steps">
+   <div class="step"><div class="sn">01<em>LEVER</em></div><div><div class="sq">Pallets are the only lever</div><div class="sf">cost = pallets × km × €/PAL/km</div><div class="sa">Distances and rates are fixed per customer, so the cost can only fall if fewer pallets are booked for the same goods.</div></div></div>
+   <div class="step hot"><div class="sn">02<em>ROUNDING</em></div><div><div class="sq">Every shipment rounds up to whole pallets</div><div class="sf">loss per shipment = ROUNDUP(share) − share, between 0 and almost 1 pallet</div><div class="sa">Daily, a typical customer ships ${(B.share/B.ships).toFixed(2)} pallets of goods but books ${(B.pal/B.ships).toFixed(2)}: ${nf(B.pal-B.share)} empty pallets a year. Weekly, ${(Wk.share/Wk.ships).toFixed(2)} pallets of goods per shipment fill ${(Wk.pal/Wk.ships).toFixed(2)} booked pallets: only ${nf(Wk.pal-Wk.share)} empty pallets.</div></div></div>
+   <div class="step"><div class="sn">03<em>EXAMPLE</em></div><div><div class="sq">${C[ex.c]} in the week of ${fmtDate(exWeekStart)}</div><div class="sf">${exDaily.length} daily shipments → 1 weekly shipment</div><div class="sa">Daily: ${exDaily.map(s=>`${fmtDate(s.start).slice(0,5)} ${s.share.toFixed(2)}→${s.pal}`).join(" · ")} = <b>${total(exDaily.map(s=>s.pal))} pallets, ${eur(total(exDaily.map(s=>s.cost)))}</b>. Weekly: ${exWeek?`${exWeek.share.toFixed(2)} → <b>${exWeek.pal} pallets, ${eur(exWeek.cost)}</b>`:"–"}.</div></div></div>
+   <div class="step"><div class="sn">04<em>RETURNS</em></div><div><div class="sq">Savings flatten after one week</div><div class="sf">1 → 7 days: ${eur((B.cost-Wk.cost)/6)} saved per extra day of waiting · 7 → 14 days: ${eur((Wk.cost-curve[13].cost)/7)} per extra day</div><div class="sa">Once a weekly shipment is ~2 pallets, the rounding loss is already small; waiting longer saves little more but doubles the delay for customers.</div></div></div>
+   <div class="step"><div class="sn">05<em>PRACTICE</em></div><div><div class="sq">A calendar week is easy to book and to serve</div><div class="sf">≈ ${(total(sumW)/sumW.length).toFixed(0)} pallets per week in total (peak ${Math.max(...sumW)})</div><div class="sa">One fixed weekly slot per customer can be contracted with the carriers; customers get a predictable delivery day. If a customer cannot wait 6 days, a 2–3 day window still saves ${pc(1-curve[1].cost/B.cost)}–${pc(1-curve[2].cost/B.cost)}.</div></div></div>
+  </div>
   <h3>Sensitivity – consolidation window</h3>
   <div class="cols"><div class="frame" data-tag="WINDOW 1–14 DAYS" id="f1"></div>
   <div>${grid(FR.sens,[{h:"Window",v:s=>s.W+(s.W===1?" d (B)":s.W===7?" d (C)":" d"),c:"k"},{h:"Shipments",v:s=>nf(s.ships),c:"n"},{h:"Boxes",v:s=>nf(s.boxes),c:"n"},{h:"Box fill",v:s=>(s.boxFill*100).toFixed(1)+"%",c:"n"},{h:"Pallets",v:s=>nf(s.pal),c:"n"},{h:"Pallet fill",v:s=>pc(s.fill),c:"n"},{h:"Freight cost",v:s=>eur(s.cost),c:"n"},{h:"Saved vs daily",v:s=>eur(B.cost-s.cost),c:"n"},{h:"Longest wait",v:s=>s.W-1+" d"}])}
