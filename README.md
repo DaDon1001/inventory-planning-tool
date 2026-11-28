@@ -4,6 +4,7 @@ Inventory plan for 9 children-shirt SKUs, built as a university assignment.
 
 - **Task 1:** inventory levels, safety stock and resupply planning
 - **Task 2:** inventory value and cash flow
+- **Task 3:** freight volume consolidation: pallets to book and freight cost per lane (sheets `Freight`, `Freight_Shipments`; dashboard page 09)
 
 ## Contents
 
