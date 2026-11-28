@@ -892,6 +892,8 @@ page("freight","09","Freight","FREIGHT VOLUME",(el,P,cfg)=>{
   const exSkus=ex.box.map((b,k)=>b?`${DATA.skus[k]} ${b} box${b>1?"es":""}`:"").filter(Boolean).join(" · ");
   const nS=ex.box.slice(0,3).reduce((a,b)=>a+b,0), nML=ex.boxes-nS;
   const scen=[["A","Each order line on its own","no consolidation",A],["B","Daily per customer","main answer · ships on the order date",B],["C","Weekly per customer","recommendation · Mon–Sun, waits ≤ 6 days",Wk]];
+  const win=S.fWin??7, X=win===1?FR.B.t:win===7?FR.Wk.t:consolidate(cfg,win).t;
+  const curve=Array.from({length:14},(_,i)=>i===0?B:i===6?Wk:consolidate(cfg,i+1).t);
   const bookRows=FR.book.filter(b=>b.start+6>=0);
   const sumB=bookRows.map(b=>total(b.daily)), sumW=bookRows.map(b=>total(b.weekly));
   el.innerHTML=head("09","FREIGHT VOLUME","How much freight do we book, and what does it cost?",
@@ -900,6 +902,12 @@ page("freight","09","Freight","FREIGHT VOLUME",(el,P,cfg)=>{
   <h3>Three scenarios</h3>
   <div class="cards">${scen.map(([k,t,sub,x])=>`<div class="card"><div class="ck"><span class="stage-tag">${k}</span>${sub}</div><div class="ct2">${t}</div>
     ${readouts([["Shipments",nf(x.ships),"","",x.ships/A.ships],["Boxes",nf(x.boxes),`box fill ${pc(x.boxFill)}`,"",x.boxes/A.boxes],["Pallets",nf(x.pal),`fill ${pc(x.fill)}`,"",x.pal/A.pal,k!=="C"],["Freight cost",eur(x.cost),`${eur2(x.perPc)} per piece`,"pallets × km × €/PAL/km",x.cost/A.cost,k!=="C"]])}</div>`).join("")}</div>
+  <h3>What-if – consolidation window</h3>
+  <div class="frame sim" data-tag="WHAT-IF">
+   <label>Ship each customer every <input id="fw" type="range" min="1" max="14" value="${win}"> <b>${win===1?"1 day (daily)":win===7?"7 days (weekly)":win+" days"}</b></label>
+   <p class="note">Each customer's orders are collected for ${win} day(s) and shipped together (blocks start Monday 30 Dec 2024, so 7 days = calendar week). Pieces are added per SKU and shipment, then rounded up to boxes; pallets = ROUNDUP(Σ box shares) per shipment. Same method as the workbook.</p>
+  </div>
+  ${readouts([["Shipments",nf(X.ships),`${(X.pal/X.ships).toFixed(2)} pallets each`,"",X.ships/B.ships],["Boxes",nf(X.boxes),`box fill ${(X.boxFill*100).toFixed(1)}%`,"Σ ROUNDUP(pieces per SKU and shipment ÷ pieces per box)",X.boxes/A.boxes],["Pallets to book",nf(X.pal),`fill ${pc(X.fill)}`,"Σ ROUNDUP(Small ÷ 32 + M/L ÷ 16) per shipment",X.pal/B.pal],["Freight cost",eur(X.cost),`${eur2(X.perPc)} per piece`,"Σ pallets × km × €/PAL/km",X.cost/B.cost,true],["Saved vs daily",eur(B.cost-X.cost),pc(1-X.cost/B.cost),"",1-X.cost/B.cost],["Longest wait",(win-1)+" days","order on day 1 of a window ships on its last day","",(win-1)/13,win>7]])}
   <h3>Method – from sales order to freight cost</h3>
   <div class="steps">
    ${[["CUSTOMER","Who receives the goods?","Each country is one B2B customer with one delivery location (slide).",`All shipments leave the ${ORIGIN} (Task 1 slide).`],
@@ -923,7 +931,7 @@ page("freight","09","Freight","FREIGHT VOLUME",(el,P,cfg)=>{
   <h3>Why 32 and 16 boxes per pallet</h3><div class="cols"><div class="frame" data-tag="EPAL 120 × 80 CM">${palletSvg()}</div>
   <p class="lead" style="align-self:center">All boxes are 30 cm high, so 4 layers give a 120 cm load. Two Small boxes take the footprint of one Medium/Large box, which is why sizes can share a pallet layer by layer.</p></div></div>
   <h3>Sensitivity – consolidation window</h3>
-  <div class="cols"><div class="frame" data-tag="1 · 2 · 3 · 5 · 7 DAYS" id="f1"></div>
+  <div class="cols"><div class="frame" data-tag="WINDOW 1–14 DAYS" id="f1"></div>
   <div>${grid(FR.sens,[{h:"Window",v:s=>s.W+(s.W===1?" d (B)":s.W===7?" d (C)":" d"),c:"k"},{h:"Shipments",v:s=>nf(s.ships),c:"n"},{h:"Boxes",v:s=>nf(s.boxes),c:"n"},{h:"Box fill",v:s=>(s.boxFill*100).toFixed(1)+"%",c:"n"},{h:"Pallets",v:s=>nf(s.pal),c:"n"},{h:"Pallet fill",v:s=>pc(s.fill),c:"n"},{h:"Freight cost",v:s=>eur(s.cost),c:"n"},{h:"Saved vs daily",v:s=>eur(B.cost-s.cost),c:"n"},{h:"Longest wait",v:s=>s.W-1+" d"}])}
   <p class="lead">Longer windows fill the last box of each SKU and the last pallet better, but customers wait longer for dispatch. Without any consolidation (A) the year needs ${nf(A.pal)} pallets and ${eur(A.cost)}.</p></div></div>
   <h3>Per customer</h3>
@@ -949,7 +957,8 @@ page("freight","09","Freight","FREIGHT VOLUME",(el,P,cfg)=>{
     "Daily dispatch ships on the order date; weekly dispatch collects a customer's orders Monday–Sunday and ships once (wait up to 6 days)."].map((a,i)=>["T"+(i+1),a]),[{h:"#",v:a=>a[0]},{h:"Assumption",v:a=>a[1],c:"wrap"}])}`;
   el.querySelectorAll("#fmode button").forEach(b=>b.onclick=()=>{ S.fMode=b.dataset.m; draw(); });
   el.querySelectorAll("#fcc button").forEach(b=>b.onclick=()=>{ S.fC=+b.dataset.c; draw(); });
-  barChart(el.querySelector("#f1"),{title:"Freight cost by window",groups:FR.sens.map(s=>s.W+" d"),yLabel:"€ / year",fmt:eur,series:[{name:"Freight cost",values:FR.sens.map(s=>s.cost),color:COL.blue}]});
+  barChart(el.querySelector("#f1"),{title:"Freight cost by window",groups:curve.map(s=>s.W+"d"),yLabel:"€ / year",fmt:eur,series:[{name:"Freight cost",values:curve.map(s=>s.cost),color:COL.blue}]});
+  const fw=el.querySelector("#fw"); fw.oninput=()=>{ fw.nextElementSibling.textContent=+fw.value===1?"1 day (daily)":+fw.value===7?"7 days (weekly)":fw.value+" days"; }; fw.onchange=()=>{ S.fWin=+fw.value; draw(); };
   barChart(el.querySelector("#f2"),{title:"Freight cost per customer",groups:FR.B.lanes.map(l=>l.name.slice(0,3).toUpperCase()),yLabel:"€",fmt:eur,series:[{name:"B – daily",values:FR.B.lanes.map(l=>l.cost),color:COL.orange},{name:"C – weekly",values:FR.Wk.lanes.map(l=>l.cost),color:COL.blue}]});
   barChart(el.querySelector("#f3"),{title:"Pallets to book per week",groups:bookRows.map(b=>fmtDate(Math.max(0,b.start)).slice(0,5)),labelEvery:4,yLabel:"EPAL / week",series:[{name:"Daily dispatch",values:sumB,color:COL.orange},{name:"Weekly dispatch",values:sumW,color:COL.blue}]});
 });
